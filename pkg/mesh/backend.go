@@ -57,10 +57,12 @@ const (
 
 // Node represents a node in the network.
 type Node struct {
-	Endpoint     *wireguard.Endpoint
-	Key          wgtypes.Key
-	NoInternalIP bool
-	InternalIP   *net.IPNet
+	Endpoint       *wireguard.Endpoint
+	Key            wgtypes.Key
+	NoInternalIP   bool
+	Unschedulable  bool
+	IsControlPlane bool
+	InternalIP     *net.IPNet
 	// LastSeen is a Unix time for the last time
 	// the node confirmed it was live.
 	LastSeen int64
@@ -78,14 +80,16 @@ type Node struct {
 	Granularity         Granularity
 }
 
-// Ready indicates whether or not the node is ready.
+// Ready indicates whether the node is ready.
 func (n *Node) Ready() bool {
 	// Nodes that are not leaders will not have WireGuardIPs, so it is not required.
 	return n != nil &&
+		!n.Unschedulable &&
+		n.IsControlPlane &&
 		n.Endpoint.Ready() &&
 		n.Key != wgtypes.Key{} &&
-		n.Subnet != nil &&
-		time.Now().Unix()-n.LastSeen < int64(checkInPeriod)*2/int64(time.Second)
+		n.Subnet != nil //&&
+	//time.Now().Unix()-n.LastSeen < int64(checkInPeriod)*2/int64(time.Second) # reactivate when kilo ds is running again
 }
 
 // Peer represents a peer in the network.
@@ -94,7 +98,7 @@ type Peer struct {
 	Name string
 }
 
-// Ready indicates whether or not the peer is ready.
+// Ready indicates whether the peer is ready.
 // Peers can have empty endpoints because they may not have an
 // IP, for example if they are behind a NAT, and thus
 // will not declare their endpoint and instead allow it to be
