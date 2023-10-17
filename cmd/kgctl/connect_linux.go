@@ -317,18 +317,14 @@ func sync(table *route.Table, peerName string, privateKey wgtypes.Key, iface int
 	nodes := make(map[string]*mesh.Node)
 	var nodeNames []string
 
-	hasLeader := false
-	for _, n := range ns {
-		if n.Leader {
-			hasLeader = true
-		}
-	}
-
+	leaderIdx := -1
 	for i, n := range ns {
-		if (i == 0 && !hasLeader) || n.Leader {
-			nodes[n.Name] = n
-			hostname = n.Name
-			nodeNames = append(nodeNames, n.Name)
+		nodes[n.Name] = n
+		hostname = n.Name
+		nodeNames = append(nodeNames, n.Name)
+
+		if n.Leader {
+			leaderIdx = i
 		}
 
 		if n.WireGuardIP != nil && subnet == nil {
@@ -343,8 +339,13 @@ func sync(table *route.Table, peerName string, privateKey wgtypes.Key, iface int
 		return errors.New("did not find a valid Kilo subnet on any node")
 	}
 	subnet.IP = subnet.IP.Mask(subnet.Mask)
-	sort.Strings(nodeNames)
-	nodes[nodeNames[0]].AllowedLocationIPs = append(nodes[nodeNames[0]].AllowedLocationIPs, connectOpts.allowedIPs...)
+
+	if leaderIdx > -1 {
+		nodes[nodeNames[leaderIdx]].AllowedLocationIPs = append(nodes[nodeNames[leaderIdx]].AllowedLocationIPs, connectOpts.allowedIPs...)
+	} else {
+		sort.Strings(nodeNames)
+		nodes[nodeNames[0]].AllowedLocationIPs = append(nodes[nodeNames[0]].AllowedLocationIPs, connectOpts.allowedIPs...)
+	}
 	peers := make(map[string]*mesh.Peer)
 	for _, p := range ps {
 		if p.Ready() {
